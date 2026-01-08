@@ -1,0 +1,49 @@
+{
+  "name": "quipowallet",
+  "version": "1.0.0",
+  "description": "Gasless Agent Wallet with ERC-4337 Account Abstraction",
+  "scripts": {
+    "compile": "hardhat compile",
+    "test": "hardhat test",
+    "deploy": "hardhat run scripts/deploy.ts",
+    "deploy:sepolia": "hardhat run scripts/deploy.ts --network sepolia",
+    "deploy:base": "NETWORK=base hardhat run scripts/deploy-multichain.ts --network base",
+    "deploy:polygon": "NETWORK=polygon hardhat run scripts/deploy-multichain.ts --network polygon",
+    "deploy:arbitrum": "NETWORK=arbitrum hardhat run scripts/deploy-multichain.ts --network arbitrum",
+    "deploy:ethereum": "NETWORK=ethereum hardhat run scripts/deploy-multichain.ts --network ethereum",
+    "deploy:all": "npm run deploy:base && npm run deploy:polygon && npm run deploy:arbitrum",
+    "deploy:credit-pool": "hardhat run scripts/deploy-credit-pool.ts",
+    "deploy:credit-pool:sepolia": "hardhat run scripts/deploy-credit-pool.ts --network sepolia",
+    "seed-liquidity": "hardhat run scripts/seed-liquidity.ts",
+    "seed-liquidity:sepolia": "hardhat run scripts/seed-liquidity.ts --network sepolia",
+    "node": "hardhat node",
+    "frontend": "cd frontend && npm run dev",
+    "build:frontend": "cd frontend && npm run build",
+    "graph:codegen": "cd subgraph && graph codegen",
+    "graph:build": "cd subgraph && graph build",
+    "graph:deploy": "cd subgraph && graph deploy",
+    "interact": "hardhat run scripts/interact.ts",
+    "verify": "hardhat run scripts/verify.ts",
+    "mnemonic-to-key": "node scripts/mnemonic-to-key.js",
+    "mnemonic-to-key:ts": "npx ts-node scripts/mnemonic-to-key.ts",
+    "test-rpc": "npx ts-node scripts/test-rpc.ts",
+    "get-address": "hardhat run scripts/get-deployer-address.ts",
+    "check-balance": "hardhat run scripts/check-balance.ts",
+    "fund-paymaster": "hardhat run scripts/fund-paymaster.ts",
+    "test:wallet": "hardhat run scripts/test-wallet-creation.ts --network sepolia",
+    "test:paymaster": "hardhat run scripts/test-paymaster.ts --network sepolia"
+  },
+  "devDependencies": {
+    "@nomicfoundation/hardhat-toolbox": "^4.0.0",
+    "@nomicfoundation/hardhat-verify": "^2.0.0",
+    "@typechain/ethers-v6": "^0.5.1",
+    "@typechain/hardhat": "^9.1.0",
+    "hardhat": "^2.28.2",
+    "typescript": "^5.3.3"
+  },
+  "dependencies": {
+    "@account-abstraction/contracts": "^0.6.0",
+    "@openzeppelin/contracts": "^4.9.6",
+    "dotenv": "^16.3.1"
+  }
+}

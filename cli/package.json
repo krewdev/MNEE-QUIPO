@@ -1,0 +1,40 @@
+{
+  "name": "@quipowallet/mnee-cli-extension",
+  "version": "1.0.0",
+  "description": "MNEE CLI Extension - Cross-chain token transfers, Bitcoin Ordinals, and ERC-4337 integration for MNEE Hackathon",
+  "main": "dist/index.js",
+  "bin": {
+    "mnee-x": "./dist/index.js",
+    "mnee-hackathon": "./dist/index.js"
+  },
+  "scripts": {
+    "build": "tsc",
+    "start": "node dist/index.js",
+    "dev": "ts-node src/index.ts"
+  },
+  "keywords": [
+    "mnee",
+    "cli",
+    "cross-chain",
+    "ethereum",
+    "crypto"
+  ],
+  "author": "",
+  "license": "MIT",
+  "dependencies": {
+    "@mnee/ts-sdk": "^1.0.3",
+    "@types/inquirer": "^9.0.9",
+    "axios": "^1.13.2",
+    "chalk": "^5.6.2",
+    "commander": "^11.1.0",
+    "dotenv": "^16.3.1",
+    "ethers": "^6.16.0",
+    "inquirer": "^13.1.0",
+    "ora": "^9.0.0"
+  },
+  "devDependencies": {
+    "@types/node": "^20.10.6",
+    "ts-node": "^10.9.2",
+    "typescript": "^5.3.3"
+  }
+}

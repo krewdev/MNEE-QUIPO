@@ -1,0 +1,45 @@
+node_modules/
+.env
+dist/
+cache/
+artifacts/
+typechain-types/
+coverage/
+coverage.json
+*.log
+
+# Frontend
+frontend/.next/
+frontend/out/
+frontend/node_modules/
+
+# Subgraph
+subgraph/node_modules/
+subgraph/build/
+
+# OS
+.DS_Store
+*.swp
+*.swo
+*~
+
+# IDE
+.vscode/
+.idea/
+*.iml
+
+# Build outputs
+build/
+out/
+*.sol.js
+*.sol.ts
+
+# Environment
+.env.local
+.env.*.local
+
+# Large files
+*.dylib
+*.so
+*.dll
+

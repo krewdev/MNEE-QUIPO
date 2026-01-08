@@ -1,0 +1,22 @@
+{
+  "network": "sepolia",
+  "chainId": "11155111",
+  "deployer": "0xb000dFC8D1CB290834cc59BEe0fBC4e2fd5aD3E3",
+  "contracts": {
+    "mneeToken": "0xc34c79b53d85aB19e253Bd4e775941227a683214",
+    "utxoToken": "0x1275B486e33BD4F390f1C4778bbe8969466Bf37B",
+    "factory": "0x3BA8637D04a84261BB90356F08878B502f74028c",
+    "paymaster": "0x57c760DAd6b54d4Cf7b4551901D4a7C5Ab5D1C26",
+    "bridge": "0x22Fc4BbF8104E3EFAE9D271A8Bd96a7dF957B51D",
+    "entryPoint": "0x0000000071727De22E5E9d8BAf0edAc6f37da032",
+    "creditPool": "0xa490D51B749ba239f73fAA2e550220dB00D39018",
+    "agentWalletStaking": "0xfDbF41F581f87Afd6E43D09B2C5E878c8dF25AA4"
+  },
+  "treasury": "0xb000dFC8D1CB290834cc59BEe0fBC4e2fd5aD3E3",
+  "mneeRate": "1.0",
+  "hackathon": {
+    "track": "AI & Agent Payments",
+    "mneeContract": "0x8ccedbAe4916b79da7F3F612EfB2EB93A2bFD6cF"
+  },
+  "timestamp": "2026-01-07T01:55:06.683Z"
+}

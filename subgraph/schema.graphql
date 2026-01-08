@@ -1,0 +1,90 @@
+type Transfer @entity {
+  id: ID!
+  from: Bytes!
+  to: Bytes!
+  value: BigInt!
+  timestamp: BigInt!
+  blockNumber: BigInt!
+  transactionHash: Bytes!
+}
+
+type Approval @entity {
+  id: ID!
+  owner: Bytes!
+  spender: Bytes!
+  value: BigInt!
+  timestamp: BigInt!
+  blockNumber: BigInt!
+  transactionHash: Bytes!
+}
+
+type TokenMint @entity {
+  id: ID!
+  to: Bytes!
+  amount: BigInt!
+  timestamp: BigInt!
+  blockNumber: BigInt!
+  transactionHash: Bytes!
+}
+
+type TokenBurn @entity {
+  id: ID!
+  from: Bytes!
+  amount: BigInt!
+  timestamp: BigInt!
+  blockNumber: BigInt!
+  transactionHash: Bytes!
+}
+
+type GasSponsored @entity {
+  id: ID!
+  user: Bytes!
+  gasCost: BigInt!
+  mneeAmount: BigInt!
+  userOpHash: Bytes!
+  timestamp: BigInt!
+  blockNumber: BigInt!
+  transactionHash: Bytes!
+}
+
+type RateUpdate @entity {
+  id: ID!
+  oldRate: BigInt!
+  newRate: BigInt!
+  timestamp: BigInt!
+  blockNumber: BigInt!
+  transactionHash: Bytes!
+}
+
+type TreasuryUpdate @entity {
+  id: ID!
+  oldTreasury: Bytes!
+  newTreasury: Bytes!
+  timestamp: BigInt!
+  blockNumber: BigInt!
+  transactionHash: Bytes!
+}
+
+type WalletCreated @entity {
+  id: ID!
+  owner: Bytes!
+  wallet: Bytes!
+  index: BigInt!
+  timestamp: BigInt!
+  blockNumber: BigInt!
+  transactionHash: Bytes!
+}
+
+type PaymasterStats @entity {
+  id: ID!
+  totalGasSponsored: BigInt!
+  totalMNEEcollected: BigInt!
+  lastUpdated: BigInt!
+}
+
+type FactoryStats @entity {
+  id: ID!
+  totalWallets: BigInt!
+  lastUpdated: BigInt!
+}
+

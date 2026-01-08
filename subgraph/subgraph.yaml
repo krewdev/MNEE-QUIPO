@@ -1,0 +1,84 @@
+specVersion: 0.0.5
+schema:
+  file: ./schema.graphql
+dataSources:
+  - kind: ethereum
+    name: MNEEToken
+    network: sepolia
+    source:
+      address: "{{MNEE_TOKEN_ADDRESS}}"
+      abi: MNEEToken
+      startBlock: 0
+    mapping:
+      kind: ethereum/events
+      apiVersion: 0.0.7
+      language: wasm/assemblyscript
+      entities:
+        - Transfer
+        - Approval
+        - Minted
+        - Burned
+      abis:
+        - name: MNEEToken
+          file: ./abis/MNEEToken.json
+      eventHandlers:
+        - event: Transfer(indexed address,indexed address,uint256)
+          handler: handleTransfer
+        - event: Approval(indexed address,indexed address,uint256)
+          handler: handleApproval
+        - event: Minted(indexed address,uint256)
+          handler: handleMinted
+        - event: Burned(indexed address,uint256)
+          handler: handleBurned
+      file: ./src/mnee-token.ts
+
+  - kind: ethereum
+    name: MNEEPaymaster
+    network: sepolia
+    source:
+      address: "{{PAYMASTER_ADDRESS}}"
+      abi: MNEEPaymaster
+      startBlock: 0
+    mapping:
+      kind: ethereum/events
+      apiVersion: 0.0.7
+      language: wasm/assemblyscript
+      entities:
+        - GasSponsored
+        - RateUpdated
+        - TreasuryUpdated
+      abis:
+        - name: MNEEPaymaster
+          file: ./abis/MNEEPaymaster.json
+        - name: MNEEToken
+          file: ./abis/MNEEToken.json
+      eventHandlers:
+        - event: GasSponsored(indexed address,uint256,uint256,indexed bytes32)
+          handler: handleGasSponsored
+        - event: RateUpdated(uint256,uint256)
+          handler: handleRateUpdated
+        - event: TreasuryUpdated(address,address)
+          handler: handleTreasuryUpdated
+      file: ./src/paymaster.ts
+
+  - kind: ethereum
+    name: AgentWalletFactory
+    network: sepolia
+    source:
+      address: "{{FACTORY_ADDRESS}}"
+      abi: AgentWalletFactory
+      startBlock: 0
+    mapping:
+      kind: ethereum/events
+      apiVersion: 0.0.7
+      language: wasm/assemblyscript
+      entities:
+        - WalletCreated
+      abis:
+        - name: AgentWalletFactory
+          file: ./abis/AgentWalletFactory.json
+      eventHandlers:
+        - event: WalletCreated(indexed address,indexed address,uint256)
+          handler: handleWalletCreated
+      file: ./src/factory.ts
+

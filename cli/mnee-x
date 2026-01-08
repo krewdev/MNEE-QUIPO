@@ -1,0 +1,9 @@
+#!/usr/bin/env node
+/**
+ * MNEE CLI Extension - Direct executable
+ * Run this directly: ./mnee-x chains
+ * Or add to PATH: chmod +x mnee-x && export PATH=$PATH:/Users/krewdev/QUIPOWALLET/cli
+ */
+
+require('./dist/index.js');
+
