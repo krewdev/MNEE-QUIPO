@@ -323,3 +323,4 @@ function addLiquidity(uint256 usdcAmount) external {
 
 **This staking protocol enables agents to leverage their MNEE holdings while maintaining liquidity for operations!** 🚀
 
+

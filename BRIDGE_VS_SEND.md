@@ -115,3 +115,4 @@ From the contract comments:
 
 **TL;DR:** Yes, bridging is cross-chain sending. "Bridge" is just the technical term for the lock-and-mint mechanism used to move tokens between different blockchains.
 
+

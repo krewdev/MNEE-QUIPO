@@ -345,8 +345,9 @@ program
         process.exit(1);
       }
 
-      // Get MNEE token address for the chain
-      const mneeAddress = network.mneeToken || "0x8ccedbAe4916b79da7F3F612EfB2EB93A2bFD6cF";
+      // Get MNEE token address for the chain (load from deployment file first)
+      const deployment = loadDeploymentAddresses(network.chainId);
+      const mneeAddress = deployment.mneeToken || network.mneeToken || "0x8ccedbAe4916b79da7F3F612EfB2EB93A2bFD6cF";
       
       // Setup provider and signer
       const rpcUrl = options.rpc || network.rpcUrl;
@@ -429,6 +430,7 @@ program
   .option("--to <address>", "Recipient address on target chain")
   .option("--amount <amount>", "Amount to bridge (in MNEE)")
   .option("--from <chain>", "Source chain (bitcoin, ethereum, base, polygon, arbitrum)")
+  .option("--from-chain <chain>", "Source chain (alias for --from)")
   .option("--to-chain <chain>", "Target chain (ethereum, base, polygon, arbitrum)")
   .option("--from-address <address>", "Source address (Bitcoin address if from=bitcoin)")
   .option("--bitcoin-rpc <url>", "Bitcoin RPC URL (if bridging from Bitcoin)")
@@ -438,7 +440,7 @@ program
       console.log(chalk.bold.cyan("\n🌉 MNEE Bridge\n"));
 
       // Interactive prompts for missing options
-      let fromChain = options.from || await inquirer.prompt([
+      let fromChain = options.from || options.fromChain || await inquirer.prompt([
         {
           type: "list",
           name: "from",
@@ -655,7 +657,9 @@ program
         process.exit(1);
       }
 
-      const mneeAddress = network.mneeToken || "0x8ccedbAe4916b79da7F3F612EfB2EB93A2bFD6cF";
+      // Load from deployment file first, then network config, then fallback
+      const deployment = loadDeploymentAddresses(network.chainId);
+      const mneeAddress = deployment.mneeToken || network.mneeToken || "0x8ccedbAe4916b79da7F3F612EfB2EB93A2bFD6cF";
       const rpcUrl = options.rpc || network.rpcUrl;
       const provider = new ethers.JsonRpcProvider(rpcUrl);
       
@@ -1307,6 +1311,158 @@ program
         }
         process.exit(1);
       }
+    } catch (error: any) {
+      console.error(chalk.red(`❌ Error: ${error.message}`));
+      process.exit(1);
+    }
+  });
+
+program
+  .command("check-contract")
+  .description("Check contract information and identify contract type")
+  .requiredOption("--address <address>", "Contract address to check")
+  .option("--chain <chain>", "Chain to check on", "sepolia")
+  .option("--rpc <url>", "Custom RPC URL")
+  .action(async (options) => {
+    try {
+      console.log(chalk.bold.cyan("\n🔍 Check Contract\n"));
+
+      const network = NETWORKS[options.chain];
+      if (!network) {
+        console.error(`❌ Unknown chain: ${options.chain}`);
+        process.exit(1);
+      }
+
+      const rpcUrl = options.rpc || network.rpcUrl;
+      const provider = new ethers.JsonRpcProvider(rpcUrl);
+      const address = options.address;
+
+      console.log(`📍 Address: ${address}`);
+      console.log(`🌐 Chain: ${network.name} (Chain ID: ${network.chainId})`);
+      console.log(`🔗 Explorer: ${network.explorer}/address/${address}\n`);
+
+      // Check if it's a contract
+      const code = await provider.getCode(address);
+      if (code === "0x") {
+        console.log(chalk.red("❌ Not a contract (EOA - Externally Owned Account)"));
+        return;
+      }
+
+      console.log(chalk.green("✅ Is a contract"));
+      console.log(`📦 Code size: ${(code.length - 2) / 2} bytes\n`);
+
+      // Try to identify contract type
+      const BridgeABI = [
+        "function utxoToken() view returns (address)",
+        "function erc20Token() view returns (address)",
+        "function owner() view returns (address)",
+      ];
+
+      const UTXOABI = [
+        "function totalSupply() view returns (uint256)",
+        "function owner() view returns (address)",
+        "function MAX_SUPPLY() view returns (uint256)",
+      ];
+
+      const ERC20ABI = [
+        "function totalSupply() view returns (uint256)",
+        "function symbol() view returns (string)",
+        "function decimals() view returns (uint8)",
+        "function name() view returns (string)",
+      ];
+
+      const FactoryABI = [
+        "function entryPoint() view returns (address)",
+        "function totalWallets() view returns (uint256)",
+      ];
+
+      const PaymasterABI = [
+        "function mneeToken() view returns (address)",
+        "function treasury() view returns (address)",
+        "function totalGasSponsored() view returns (uint256)",
+      ];
+
+      // Check for BridgeMNEE
+      try {
+        const bridge = new ethers.Contract(address, BridgeABI, provider);
+        const utxoToken = await bridge.utxoToken().catch(() => null);
+        if (utxoToken && utxoToken !== ethers.ZeroAddress) {
+          console.log(chalk.cyan("✅ Contract Type: BridgeMNEE"));
+          console.log(`   UTXO Token: ${utxoToken}`);
+          const erc20Token = await bridge.erc20Token().catch(() => "N/A");
+          console.log(`   ERC20 Token: ${erc20Token}`);
+          const owner = await bridge.owner().catch(() => "N/A");
+          console.log(`   Owner: ${owner}`);
+          return;
+        }
+      } catch {}
+
+      // Check for MNEETokenUTXO
+      try {
+        const utxo = new ethers.Contract(address, UTXOABI, provider);
+        const maxSupply = await utxo.MAX_SUPPLY().catch(() => null);
+        if (maxSupply) {
+          console.log(chalk.cyan("✅ Contract Type: MNEETokenUTXO"));
+          const totalSupply = await utxo.totalSupply();
+          console.log(`   Total Supply: ${ethers.formatEther(totalSupply)} MNEE`);
+          console.log(`   Max Supply: ${ethers.formatEther(maxSupply)} MNEE`);
+          const owner = await utxo.owner().catch(() => "N/A");
+          console.log(`   Owner: ${owner}`);
+          return;
+        }
+      } catch {}
+
+      // Check for ERC20 Token
+      try {
+        const token = new ethers.Contract(address, ERC20ABI, provider);
+        const symbol = await token.symbol().catch(() => null);
+        if (symbol) {
+          console.log(chalk.cyan(`✅ Contract Type: ERC-20 Token (${symbol})`));
+          const name = await token.name().catch(() => "N/A");
+          console.log(`   Name: ${name}`);
+          const decimals = await token.decimals().catch(() => "N/A");
+          console.log(`   Decimals: ${decimals}`);
+          const totalSupply = await token.totalSupply().catch(() => null);
+          if (totalSupply) {
+            console.log(`   Total Supply: ${ethers.formatUnits(totalSupply, decimals)} ${symbol}`);
+          }
+          return;
+        }
+      } catch {}
+
+      // Check for Factory
+      try {
+        const factory = new ethers.Contract(address, FactoryABI, provider);
+        const entryPoint = await factory.entryPoint().catch(() => null);
+        if (entryPoint && entryPoint !== ethers.ZeroAddress) {
+          console.log(chalk.cyan("✅ Contract Type: AgentWalletFactory"));
+          console.log(`   EntryPoint: ${entryPoint}`);
+          const totalWallets = await factory.totalWallets().catch(() => "N/A");
+          console.log(`   Total Wallets Created: ${totalWallets}`);
+          return;
+        }
+      } catch {}
+
+      // Check for Paymaster
+      try {
+        const paymaster = new ethers.Contract(address, PaymasterABI, provider);
+        const mneeToken = await paymaster.mneeToken().catch(() => null);
+        if (mneeToken && mneeToken !== ethers.ZeroAddress) {
+          console.log(chalk.cyan("✅ Contract Type: MNEEPaymaster"));
+          console.log(`   MNEE Token: ${mneeToken}`);
+          const treasury = await paymaster.treasury().catch(() => "N/A");
+          console.log(`   Treasury: ${treasury}`);
+          const totalGasSponsored = await paymaster.totalGasSponsored().catch(() => null);
+          if (totalGasSponsored) {
+            console.log(`   Total Gas Sponsored: ${ethers.formatEther(totalGasSponsored)} ETH`);
+          }
+          return;
+        }
+      } catch {}
+
+      console.log(chalk.yellow("⚠️  Could not identify contract type"));
+      console.log(chalk.gray("   It's a contract but doesn't match known ABIs"));
+      console.log(chalk.gray(`   View on explorer: ${network.explorer}/address/${address}`));
     } catch (error: any) {
       console.error(chalk.red(`❌ Error: ${error.message}`));
       process.exit(1);

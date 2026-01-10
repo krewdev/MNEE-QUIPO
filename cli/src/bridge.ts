@@ -131,22 +131,25 @@ export class MNEEBridge {
       const bridgeAddress = loadBridgeAddress(chainId);
       
       console.log("📝 Bridge Process:");
-      console.log("   1. Send MNEE UTXOs to bridge address on Bitcoin");
+      console.log("   1. Send/spend MNEE from your Bitcoin address");
       console.log("   2. Wait for Bitcoin confirmation (6+ blocks)");
-      console.log("   3. Bridge operator submits proof to BridgeMNEE contract");
+      console.log("   3. Bridge operator submits proof with your recipient address");
       console.log("   4. Claim MNEE on target chain using claimBitcoinDeposit()\n");
       
       if (bridgeAddress) {
         console.log(`📋 Bridge Contract: ${bridgeAddress} (${config.targetChain})`);
         console.log("\n💡 To complete the bridge:");
-        console.log(`   1. Send ${config.amount} MNEE from Bitcoin address ${config.bitcoinAddress}`);
-        console.log(`      (Send to bridge address on Bitcoin - check bridge documentation)`);
+        console.log(`   1. Send/spend ${config.amount} MNEE from Bitcoin address: ${config.bitcoinAddress}`);
+        console.log(`      Note: Bitcoin doesn't have contracts, so send to any address or burn`);
+        console.log(`      The bridge operator monitors transactions FROM your address`);
         console.log(`   2. Wait for Bitcoin confirmation (6+ blocks)`);
-        console.log(`   3. Get the Bitcoin transaction hash (txid)`);
+        console.log(`   3. Get the Bitcoin transaction hash (txid) of the send/spend`);
         console.log(`   4. Bridge operator calls: submitBitcoinProof(txHash, blockHeight, merkleProof, ${ethers.parseEther(config.amount.toString())}, ${config.targetAddress})`);
-        console.log(`   5. You call: claimBitcoinDeposit(txHash) on bridge contract ${bridgeAddress}\n`);
+        console.log(`      ⚠️  The recipient address (${config.targetAddress}) is set by the bridge operator when submitting the proof`);
+        console.log(`   5. You call: claimBitcoinDeposit(txHash) from address ${config.targetAddress} on ${config.targetChain}\n`);
         
         console.log("🔧 To claim after proof is submitted:");
+        console.log(`   Make sure you're calling from the recipient address: ${config.targetAddress}`);
         console.log(`   Use CLI: ./mnee-x claim-deposit --tx-hash <bitcoinTxHash> --chain ${config.targetChain}`);
         console.log(`   Or call directly: claimBitcoinDeposit(bitcoinTxHash) on ${bridgeAddress}\n`);
       } else {
