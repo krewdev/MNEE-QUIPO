@@ -292,6 +292,8 @@ export class OrdinalsBotClient {
 
   /**
    * Create a transfer inscription for MNEE (BRC-20 style)
+   * Note: BRC-20 transfers create an inscription that must be sent to the recipient
+   * The recipient address is validated but the actual transfer happens when the inscription UTXO is sent
    */
   async createTransfer(
     fromAddress: string,
@@ -299,6 +301,23 @@ export class OrdinalsBotClient {
     amount: number,
     tick: string = "MNEE"
   ): Promise<string> {
+    // Validate Bitcoin address format before API call
+    // Bitcoin addresses can be Legacy (1...), P2SH (3...), or Bech32 (bc1.../tb1...)
+    if (!toAddress || (toAddress.length < 26 || toAddress.length > 62)) {
+      throw new Error(`Invalid recipient address: ${toAddress}. Address must be 26-62 characters.`);
+    }
+    
+    // Basic format validation
+    const isValidFormat = 
+      toAddress.startsWith("1") ||      // Legacy P2PKH
+      toAddress.startsWith("3") ||      // P2SH  
+      toAddress.startsWith("bc1") ||    // Bech32 SegWit (mainnet)
+      toAddress.startsWith("tb1");      // Bech32 SegWit (testnet)
+    
+    if (!isValidFormat) {
+      throw new Error(`Invalid recipient address: ${toAddress}. Address must start with 1 (Legacy), 3 (P2SH), bc1 (Bech32 mainnet), or tb1 (Bech32 testnet).`);
+    }
+    
     // Create BRC-20 transfer inscription JSON
     const transferData = {
       p: "brc-20",
@@ -308,24 +327,147 @@ export class OrdinalsBotClient {
     };
 
     try {
-      // Submit inscription request to OrdinalsBot
-      const response = await this.api.post<OrdinalsBotResponse<{ inscription_id: string }>>(
+      // OrdinalsBot API: Create BRC-20 transfer inscription
+      // The API requires both sender address and receiveAddress (recipient)
+      // Fee must be between 0.1 and 100000 (in satoshis, not fee_rate)
+      
+      // Fee must be between 0.1 and 100000 (in satoshis)
+      // Using 10 satoshis as a safe minimum
+      const feeAmount = 10;
+      
+      // Create BRC-20 transfer inscription content
+      const contentString = JSON.stringify(transferData);
+      
+      // OrdinalsBot API payload - simplified format
+      // Based on error responses, it seems the API might expect specific format
+      const payload: any = {
+        address: fromAddress,  // Sender address
+        receiveAddress: toAddress,  // Recipient address (required)
+        content: contentString,  // BRC-20 transfer JSON
+        content_type: "text/plain;charset=utf-8",
+        fee: feeAmount, // Fee in satoshis (0.1-100000)
+        postage: 546, // Standard dust limit
+      };
+      
+      const response = await this.api.post<OrdinalsBotResponse<{ inscription_id: string; ticket_id?: string }>>(
         "/inscribe",
-        {
-          address: fromAddress,
-          content: JSON.stringify(transferData),
-          content_type: "text/plain;charset=utf-8",
-          fee_rate: 1, // sat/vB
-        }
+        payload
       );
 
-      if (response.data.success && response.data.data) {
-        return response.data.data.inscription_id;
+      // Handle different response formats
+      let inscriptionId: string | undefined;
+      
+      if (response.data) {
+        // Check if response has success/data structure
+        if (response.data.success && response.data.data) {
+          inscriptionId = response.data.data.inscription_id || response.data.data.ticket_id;
+        } else if ((response.data as any).inscription_id) {
+          // Check if response has direct inscription_id
+          inscriptionId = (response.data as any).inscription_id;
+        } else if ((response.data as any).ticket_id) {
+          // Check for ticket_id (some APIs use this)
+          inscriptionId = (response.data as any).ticket_id;
+        }
+        
+        // If we got an inscription ID, return it
+        if (inscriptionId) {
+          console.log(`⚠️  Note: BRC-20 transfer inscription created at sender address: ${fromAddress}`);
+          console.log(`   Inscription ID: ${inscriptionId}`);
+          console.log(`   Recipient: ${toAddress}`);
+          console.log(`   Next step: Send the inscription UTXO to recipient address ${toAddress} on Bitcoin network`);
+          return inscriptionId;
+        }
+        
+        // If response has error field
+        if (response.data.error) {
+          const errorMsg = typeof response.data.error === "string" 
+            ? response.data.error 
+            : JSON.stringify(response.data.error);
+          throw new Error(errorMsg);
+        }
       }
 
-      throw new Error(response.data.error || "Failed to create transfer");
+      // If we get here, response format is unexpected
+      throw new Error(`Unexpected API response format: ${JSON.stringify(response.data || response)}`);
     } catch (error: any) {
-      throw new Error(`OrdinalsBot inscription error: ${error.message}`);
+      // Extract error message from API response
+      let errorMsg = "";
+      
+      if (error.response?.data) {
+        const data = error.response.data;
+        
+        // Handle different error response formats
+        if (typeof data === "string") {
+          errorMsg = data;
+        } else if (data.error) {
+          errorMsg = typeof data.error === "string" ? data.error : JSON.stringify(data.error);
+        } else if (data.message) {
+          errorMsg = typeof data.message === "string" ? data.message : JSON.stringify(data.message);
+        } else if (Array.isArray(data)) {
+          // If error is an array, extract meaningful messages from each item
+          const errorMessages = data.map((item: any) => {
+            if (typeof item === "string") {
+              return item;
+            } else if (typeof item === "object") {
+              // Try to extract meaningful error information
+              if (item.message) return item.message;
+              if (item.error) return typeof item.error === "string" ? item.error : JSON.stringify(item.error);
+              if (item.msg) return item.msg;
+              if (item.detail) return typeof item.detail === "string" ? item.detail : JSON.stringify(item.detail);
+              // If object has only one key-value, return that
+              const keys = Object.keys(item);
+              if (keys.length === 1) {
+                return `${keys[0]}: ${typeof item[keys[0]] === "string" ? item[keys[0]] : JSON.stringify(item[keys[0]])}`;
+              }
+              // Otherwise, return formatted JSON
+              return JSON.stringify(item, null, 2);
+            }
+            return String(item);
+          });
+          errorMsg = errorMessages.filter((msg: string) => msg && msg.trim()).join("; ");
+        } else if (typeof data === "object") {
+          // Try to extract meaningful error information
+          errorMsg = JSON.stringify(data);
+          
+          // If we can extract specific fields
+          if (data.detail) {
+            errorMsg = typeof data.detail === "string" ? data.detail : JSON.stringify(data.detail);
+          } else if (data.errors) {
+            errorMsg = typeof data.errors === "string" ? data.errors : JSON.stringify(data.errors);
+          }
+        } else {
+          errorMsg = String(data);
+        }
+      }
+      
+      // Fallback to error message if no response data
+      if (!errorMsg) {
+        errorMsg = error.message || String(error);
+      }
+      
+      // Clean up the error message (remove [object Object] patterns)
+      errorMsg = errorMsg.replace(/\[object Object\]/g, "").trim();
+      
+      // Provide more helpful error messages
+      if (errorMsg.toLowerCase().includes("invalid") && errorMsg.toLowerCase().includes("recipient")) {
+        throw new Error(`Invalid recipient address: ${toAddress}. Please ensure it's a valid Bitcoin address format (Legacy: 1..., P2SH: 3..., Bech32: bc1.../tb1...). Original error: ${errorMsg}`);
+      }
+      
+      if (errorMsg.toLowerCase().includes("invalid") && errorMsg.toLowerCase().includes("address")) {
+        throw new Error(`Invalid Bitcoin address: ${toAddress}. Address must be 26-62 characters and start with 1 (Legacy), 3 (P2SH), bc1 (Bech32 mainnet), or tb1 (Bech32 testnet). Original error: ${errorMsg}`);
+      }
+      
+      if (error.response?.status === 400 || error.response?.status === 422) {
+        throw new Error(`OrdinalsBot API validation error (${error.response.status}): ${errorMsg || "Invalid request parameters"}. Please check address format and try again.`);
+      }
+      
+      if (error.response?.status === 401 || error.response?.status === 403) {
+        throw new Error(`OrdinalsBot API authentication error (${error.response.status}): API key may be missing or invalid. Set ORDINALSBOT_API_KEY in .env file. Original error: ${errorMsg}`);
+      }
+      
+      // Include full error details for debugging
+      const statusCode = error.response?.status ? ` (HTTP ${error.response.status})` : "";
+      throw new Error(`OrdinalsBot inscription error${statusCode}: ${errorMsg || error.message || "Unknown error"}`);
     }
   }
 }

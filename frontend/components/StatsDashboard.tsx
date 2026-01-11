@@ -33,26 +33,32 @@ export default function StatsDashboard({
     <div className="space-y-4 md:space-y-6">
       {/* Stats Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 md:gap-4">
-        <div className="bg-blue-600/20 backdrop-blur-sm border border-blue-500/50 rounded-lg p-4 md:p-6">
+        <div className="bg-blue-600/20 backdrop-blur-sm border border-blue-500/50 rounded-lg p-4 md:p-6 hover:bg-blue-600/30 transition-all">
           <p className="text-xs md:text-sm text-gray-300 mb-1">Total Gas Sponsored</p>
           <p className="text-xl md:text-2xl font-bold">{parseFloat(gasSponsored).toFixed(4)} ETH</p>
+          <p className="text-xs text-gray-400 mt-2">Paymaster has sponsored this amount in gas fees</p>
         </div>
 
-        <div className="bg-purple-600/20 backdrop-blur-sm border border-purple-500/50 rounded-lg p-4 md:p-6">
+        <div className="bg-purple-600/20 backdrop-blur-sm border border-purple-500/50 rounded-lg p-4 md:p-6 hover:bg-purple-600/30 transition-all">
           <p className="text-xs md:text-sm text-gray-300 mb-1">MNEE Collected</p>
           <p className="text-xl md:text-2xl font-bold">{parseFloat(mneeCollected).toFixed(2)} MNEE</p>
+          <p className="text-xs text-gray-400 mt-2">Total MNEE tokens collected as payment</p>
         </div>
 
-        <div className="bg-green-600/20 backdrop-blur-sm border border-green-500/50 rounded-lg p-4 md:p-6">
+        <div className="bg-green-600/20 backdrop-blur-sm border border-green-500/50 rounded-lg p-4 md:p-6 hover:bg-green-600/30 transition-all">
           <p className="text-xs md:text-sm text-gray-300 mb-1">Your MNEE Balance</p>
           <p className="text-xl md:text-2xl font-bold">
             {isConnected ? parseFloat(mneeBalance).toFixed(2) : "0.00"} MNEE
           </p>
+          <p className="text-xs text-gray-400 mt-2">
+            {isConnected ? "Your current MNEE token balance" : "Connect wallet to see balance"}
+          </p>
         </div>
 
-        <div className="bg-orange-600/20 backdrop-blur-sm border border-orange-500/50 rounded-lg p-4 md:p-6">
+        <div className="bg-orange-600/20 backdrop-blur-sm border border-orange-500/50 rounded-lg p-4 md:p-6 hover:bg-orange-600/30 transition-all">
           <p className="text-xs md:text-sm text-gray-300 mb-1">Active Wallets</p>
-          <p className="text-xl md:text-2xl font-bold">--</p>
+          <p className="text-xl md:text-2xl font-bold">Live</p>
+          <p className="text-xs text-gray-400 mt-2">Agent wallets created via factory</p>
         </div>
       </div>
 

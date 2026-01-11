@@ -96,7 +96,7 @@ contract AgentWalletFactory is Ownable {
     /**
      * @dev Get all wallets (paginated)
      * @param offset Starting index
-     * @param limit Number of wallets to return
+     * @param limit Number of wallets to return (max 100 to prevent gas issues)
      * @return wallets_ Array of wallet addresses
      */
     function getAllWallets(uint256 offset, uint256 limit) 
@@ -107,6 +107,12 @@ contract AgentWalletFactory is Ownable {
         uint256 total = allWallets.length;
         if (offset >= total) {
             return new address[](0);
+        }
+        
+        // Limit max return size to prevent gas issues
+        uint256 maxLimit = 100;
+        if (limit > maxLimit) {
+            limit = maxLimit;
         }
         
         uint256 end = offset + limit;

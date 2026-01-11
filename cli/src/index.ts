@@ -201,6 +201,28 @@ async function confirmTransaction(message: string): Promise<boolean> {
   return confirmed;
 }
 
+async function promptWIF(message: string = "Bitcoin WIF (Wallet Import Format) - Required for MNEE SDK"): Promise<string> {
+  const { wif } = await inquirer.prompt([
+    {
+      type: "password",
+      name: "wif",
+      message: chalk.cyan(message),
+      mask: "*",
+      validate: (input: string) => {
+        if (!input || input.trim().length === 0) {
+          return "WIF is required for MNEE SDK transfers";
+        }
+        // Basic WIF format check (starts with K, L, 5, or c)
+        if (!/^[KL5c][a-km-zA-HJ-NP-Z1-9]{50,51}$/.test(input)) {
+          return "Invalid WIF format. WIF should start with K, L, 5, or c and be 51-52 characters";
+        }
+        return true;
+      },
+    },
+  ]);
+  return wif as string;
+}
+
 const program = new Command();
 
 program
@@ -227,31 +249,33 @@ program
   .action(async (options) => {
     // Handle Bitcoin Ordinals as source
     if (options.fromChain === "bitcoin") {
-      console.log(chalk.bold.cyan("\n₿ Send MNEE on Bitcoin\n"));
-      
+      try {
+        console.log(chalk.bold.cyan("\n₿ Send MNEE on Bitcoin (BSV)\n"));
+        
         const fromAddress = options.fromAddress || process.env.BITCOIN_ADDRESS || "";
         if (!fromAddress) {
-        const prompted = await promptAddress("Bitcoin source address:");
-        if (!prompted) {
-          console.error(chalk.red("❌ Bitcoin address required"));
-          process.exit(1);
+          const prompted = await promptAddress("Bitcoin source address:");
+          if (!prompted) {
+            console.error(chalk.red("❌ Bitcoin address required"));
+            process.exit(1);
+          }
         }
-        // Use prompted address
-      }
-      
-      let finalFromAddress = fromAddress;
-      if (!finalFromAddress) {
-        finalFromAddress = await promptAddress("Bitcoin source address:");
-      }
-      
-      const toAddress = options.to || await promptAddress("Recipient Bitcoin address:");
-      const amount = options.amount ? parseFloat(options.amount) : await promptAmount();
-      
-      // Check if sending to another Bitcoin address or bridging
-      if (options.chain === "bitcoin" || !options.chain || options.chain === "ethereum") {
-        // Bitcoin → Bitcoin transfer
-        console.log(chalk.cyan(`\n📤 From: ${finalFromAddress}`));
-        console.log(chalk.cyan(`📥 To: ${toAddress}`));
+        
+        let finalFromAddress = fromAddress;
+        if (!finalFromAddress) {
+          finalFromAddress = await promptAddress("Bitcoin source address:");
+        }
+        
+        const toAddress = options.to || await promptAddress("Recipient address (Bitcoin or EVM):");
+        const amount = options.amount ? parseFloat(options.amount) : await promptAmount();
+        
+        // Check if sending to another Bitcoin address or bridging to EVM chain
+        const targetChain = options.chain || "bitcoin";
+        
+        if (targetChain === "bitcoin" || targetChain === "bsv") {
+        // BSV → BSV transfer (on-chain)
+        console.log(chalk.cyan(`\n📤 From: ${finalFromAddress} (BSV)`));
+        console.log(chalk.cyan(`📥 To: ${toAddress} (BSV)`));
         console.log(chalk.cyan(`💰 Amount: ${amount} MNEE\n`));
         
         // Prefer MNEE API key, fallback to OrdinalsBot key
@@ -289,50 +313,116 @@ program
             }
           }
           
-          spinner.text = "Sending MNEE via OrdinalsBot...";
-          const txId = await btcHandler.createSendTransaction(toAddress, amount);
+          // Try to create transaction
+          spinner.text = "Creating MNEE transfer transaction...";
+          let txId: string;
           
-          spinner.succeed(chalk.green("Transaction created!"));
-          console.log(chalk.cyan(`\n✅ Transaction ID: ${txId}`));
-          console.log(chalk.gray(`   View on Blockstream: https://blockstream.info/tx/${txId}`));
-          console.log(chalk.yellow(`\n⚠️  Note: This creates a transfer inscription. Wait for confirmation before it's finalized.`));
+          // Check if MNEE SDK is available and prompt for WIF if needed
+          const mneeApiKey = process.env.MNEE_API_KEY;
+          let wif: string | undefined = process.env.BITCOIN_WIF;
+          
+          if (mneeApiKey && !wif) {
+            // MNEE SDK requires WIF for BSV transfers
+            spinner.stop();
+            console.log(chalk.yellow("\n🔑 MNEE SDK requires Bitcoin WIF (Wallet Import Format) for BSV transfers"));
+            console.log(chalk.cyan("   WIF is your private key in Wallet Import Format"));
+            console.log(chalk.gray("   You can also set BITCOIN_WIF in .env to avoid this prompt\n"));
+            
+            try {
+              wif = await promptWIF();
+            } catch (wifError: any) {
+              console.log(chalk.yellow("\n⚠️  WIF not provided. Falling back to OrdinalsBot API..."));
+              console.log(chalk.gray("   Note: OrdinalsBot may have limitations. For best results, use MNEE SDK with WIF.\n"));
+            }
+            
+            spinner.start("Creating MNEE transfer transaction...");
+          }
+          
+          try {
+            txId = await btcHandler.createSendTransaction(toAddress, amount, undefined, wif);
+            spinner.succeed(chalk.green("Transaction created!"));
+            console.log(chalk.cyan(`\n✅ Transaction ID: ${txId}`));
+            console.log(chalk.gray(`   View on Blockstream: https://blockstream.info/tx/${txId}`));
+            console.log(chalk.yellow(`\n⚠️  Note: This creates a transfer inscription. Wait for confirmation before it's finalized.`));
+          } catch (sendError: any) {
+            spinner.fail(chalk.red("Failed to create transaction"));
+            
+            // Check if error suggests using MNEE SDK
+            const errorMsg = sendError.message || String(sendError);
+            if (errorMsg.includes("OrdinalsBot") || errorMsg.includes("API")) {
+              console.log(chalk.yellow(`\n💡 Alternative: Use MNEE SDK instead of OrdinalsBot`));
+              console.log(chalk.cyan(`   1. Set MNEE_API_KEY in .env file (get from https://docs.mnee.io)`));
+              console.log(chalk.cyan(`   2. Set BITCOIN_WIF in .env or provide when prompted`));
+              console.log(chalk.cyan(`   3. MNEE SDK supports BSV (Bitcoin SV) natively`));
+            }
+            
+            throw sendError;
+          }
         } catch (error: any) {
           spinner.fail(chalk.red(`Error: ${error.message}`));
-          const errorMsg = error.message || "";
-          
-          if (errorMsg.includes("403") || errorMsg.includes("not allowed")) {
-            console.log(chalk.red("\n❌ API Authentication Required"));
-            console.log(chalk.yellow("\n📝 To fix this:"));
-            console.log("   Option 1 (Preferred): Use MNEE SDK");
-            console.log("   1. Get API key from: https://docs.mnee.io");
-            console.log("   2. Sign up for MNEE Developer account");
-            console.log("   3. Add to .env file:");
-            console.log(chalk.cyan("      MNEE_API_KEY=your_mnee_api_key_here"));
-            console.log(chalk.yellow("\n   Option 2 (Fallback): Use OrdinalsBot"));
-            console.log("   1. Get API key from: https://ordinalsbot.com");
-            console.log("   2. Add to .env file:");
-            console.log(chalk.cyan("      ORDINALSBOT_API_KEY=your_ordinalsbot_key_here"));
-            console.log(chalk.yellow("\n💡 Why?"));
-            console.log("   - Creating transfers requires API authentication");
-            console.log("   - MNEE SDK is the official API (preferred)");
-            console.log("   - OrdinalsBot is a fallback option\n");
-          } else {
-            console.log(chalk.yellow("\n💡 Tips:"));
-            console.log("   - Set MNEE_API_KEY in .env (preferred)");
-            console.log("   - Or set ORDINALSBOT_API_KEY as fallback");
-            console.log("   - Check that you have sufficient MNEE balance");
-            console.log("   - Verify Bitcoin addresses are correct");
-            console.log("   - Ensure you have Bitcoin for transaction fees");
-          }
-          process.exit(1);
+          throw error;
         }
-        return;
       } else {
-        // Bitcoin → EVM (bridging)
-        console.log(chalk.yellow("\n💡 This requires bridging. Use 'bridge' command instead:"));
-        console.log(`   ./mnee-x bridge --from bitcoin --to-chain ${options.chain} --to ${toAddress} --amount ${amount}`);
-        process.exit(0);
+        // BSV → EVM Chain (use bridge)
+        console.log(chalk.cyan(`\n📤 From: ${finalFromAddress} (BSV)`));
+        console.log(chalk.cyan(`📥 To: ${toAddress} (${targetChain})`));
+        console.log(chalk.cyan(`💰 Amount: ${amount} MNEE\n`));
+        
+        console.log(chalk.yellow("🌉 Cross-chain transfer: BSV → " + targetChain));
+        console.log(chalk.gray("   This will use the bridge flow:\n"));
+        console.log(chalk.gray("   1. Send MNEE from BSV address"));
+        console.log(chalk.gray("   2. Bridge operator submits proof"));
+        console.log(chalk.gray("   3. Claim MNEE on target chain\n"));
+        
+        // Use bridge command logic
+        const bridge = new MNEEBridge();
+        const bridgeTx = await bridge.bridgeFromBitcoin({
+          bitcoinAddress: finalFromAddress,
+          targetChain: targetChain,
+          targetAddress: toAddress,
+          amount: amount,
+        });
+        
+        console.log(chalk.green(`\n✅ Bridge initiated: ${bridgeTx}`));
+        console.log(chalk.cyan(`\n💡 Next steps:`));
+        console.log(chalk.cyan(`   1. Complete BSV transaction`));
+        console.log(chalk.cyan(`   2. Bridge operator submits proof`));
+          console.log(chalk.cyan(`   3. Claim on ${targetChain} using: ./mnee-x claim-deposit --tx-hash <txHash> --chain ${targetChain}`));
+        }
+      } catch (error: any) {
+        const spinner = ora();
+        spinner.fail(chalk.red(`Error: ${error.message}`));
+        const errorMsg = error.message || "";
+        
+        if (errorMsg.includes("403") || errorMsg.includes("not allowed")) {
+          console.log(chalk.red("\n❌ API Authentication Required"));
+          console.log(chalk.yellow("\n📝 To fix this:"));
+          console.log("   Option 1 (Preferred): Use MNEE SDK for BSV transfers");
+          console.log("   1. Get API key from: https://docs.mnee.io");
+          console.log("   2. Sign up for MNEE Developer account");
+          console.log("   3. Add to .env file:");
+          console.log(chalk.cyan("      MNEE_API_KEY=your_mnee_api_key_here"));
+          console.log(chalk.cyan("      BITCOIN_WIF=your_wif_here"));
+          console.log(chalk.yellow("\n   Option 2 (Fallback): Use OrdinalsBot"));
+          console.log("   1. Get API key from: https://ordinalsbot.com");
+          console.log("   2. Add to .env file:");
+          console.log(chalk.cyan("      ORDINALSBOT_API_KEY=your_ordinalsbot_key_here"));
+          console.log(chalk.yellow("\n💡 Why?"));
+          console.log("   - Creating transfers requires API authentication");
+          console.log("   - MNEE SDK is the official API (preferred for BSV)");
+          console.log("   - OrdinalsBot is a fallback option\n");
+        } else {
+          console.log(chalk.yellow("\n💡 Tips:"));
+          console.log("   - Set MNEE_API_KEY in .env (preferred for BSV)");
+          console.log("   - Set BITCOIN_WIF in .env for MNEE SDK");
+          console.log("   - Or set ORDINALSBOT_API_KEY as fallback");
+          console.log("   - Check that you have sufficient MNEE balance");
+          console.log("   - Verify Bitcoin addresses are correct");
+          console.log("   - Ensure you have Bitcoin for transaction fees");
+        }
+        process.exit(1);
       }
+      return; // Exit after handling Bitcoin/BSV transfers
     }
 
     try {

@@ -28,6 +28,9 @@ contract MNEEPaymaster is BasePaymaster, Pausable, ReentrancyGuard {
     // Example: rate = 1e18 means 1 MNEE = 1 ETH worth of gas
     uint256 public mneeRate;
     
+    // Maximum rate to prevent extreme values (100 ETH per MNEE)
+    uint256 public constant MAX_RATE = 100e18;
+    
     // Minimum MNEE amount required for a transaction
     uint256 public minMNEEAmount;
     
@@ -147,14 +150,21 @@ contract MNEEPaymaster is BasePaymaster, Pausable, ReentrancyGuard {
         // Calculate actual MNEE amount based on actual gas cost
         uint256 actualMNEEAmount = _calculateRequiredMNEE(actualGasCost);
         
-        // Use the provided amount (which should cover the cost) or calculate from actual
-        uint256 mneeToCharge = actualMNEEAmount > providedAmount ? providedAmount : actualMNEEAmount;
+        // Charge based on actual gas cost, but don't exceed provided amount
+        uint256 mneeToCharge = actualMNEEAmount;
+        if (mneeToCharge > providedAmount) {
+            // This shouldn't happen if validation was correct, but handle gracefully
+            mneeToCharge = providedAmount;
+        }
         
         // Transfer MNEE from user to treasury
         require(
             mneeToken.transferFrom(user, treasury, mneeToCharge),
             "MNEEPaymaster: Transfer failed"
         );
+        
+        // Note: Excess MNEE is kept by the protocol as a buffer
+        // In future versions, we could refund excess, but this adds gas cost
         
         // Update stats
         totalGasSponsored += actualGasCost;
@@ -167,10 +177,13 @@ contract MNEEPaymaster is BasePaymaster, Pausable, ReentrancyGuard {
      * @dev Calculate required MNEE amount for given gas cost
      * @param gasCost Gas cost in wei
      * @return Required MNEE amount (with 18 decimals)
+     * @notice Calculation: (gasCost * 1e18) / mneeRate
+     * Precision loss is minimal for typical values. Consider rounding up in future versions.
      */
     function _calculateRequiredMNEE(uint256 gasCost) internal view returns (uint256) {
         // rate is in wei per MNEE (e.g., 1e18 = 1 ETH worth per 1 MNEE)
         // Required MNEE = (gasCost * 1e18) / rate
+        // For small gasCost values, there may be rounding errors
         return (gasCost * 1e18) / mneeRate;
     }
     
@@ -186,6 +199,7 @@ contract MNEEPaymaster is BasePaymaster, Pausable, ReentrancyGuard {
      */
     function proposeRateUpdate(uint256 _newRate) external onlyOwner {
         require(_newRate > 0, "MNEEPaymaster: Invalid rate");
+        require(_newRate <= MAX_RATE, "MNEEPaymaster: Rate exceeds maximum");
         pendingRateUpdate = PendingUpdate({
             newValue: _newRate,
             newAddress: address(0),
@@ -269,8 +283,10 @@ contract MNEEPaymaster is BasePaymaster, Pausable, ReentrancyGuard {
     
     /**
      * @dev Update minimum MNEE amount
+     * @notice Can be updated immediately but should be used with caution
      */
     function setMinMNEEAmount(uint256 _minAmount) external onlyOwner {
+        require(_minAmount > 0, "MNEEPaymaster: Invalid minimum amount");
         minMNEEAmount = _minAmount;
     }
     

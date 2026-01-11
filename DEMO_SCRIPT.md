@@ -1,4 +1,4 @@
-# 🎬 QuipoWallet Hackathon Demo - Line-by-Line Script
+x# 🎬 QuipoWallet Hackathon Demo - Line-by-Line Script
 
 **Total Time: 5-10 minutes**
 

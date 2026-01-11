@@ -30,10 +30,11 @@ contract AgentWalletStaking is AgentWallet {
      * @dev Stake MNEE and borrow from credit line in one transaction (for agentic use)
      * @param mneeStakeAmount Amount of MNEE to stake
      * @param mneeBorrowAmount Amount of MNEE to borrow (must be within credit line)
+     * @notice Must be called via EntryPoint execute() function
      */
-    function stakeAndBorrow(uint256 mneeStakeAmount, uint256 mneeBorrowAmount) external {
-        // This should be called via execute() from EntryPoint
-        // The MNEE token must be approved to this contract first
+    function stakeAndBorrow(uint256 mneeStakeAmount, uint256 mneeBorrowAmount) external onlyEntryPoint {
+        // The MNEE token must be approved to creditPool first
+        // This function should be called via execute() from EntryPoint
         
         // Stake MNEE - requires token approval first
         creditPool.stake(mneeStakeAmount);
@@ -43,10 +44,10 @@ contract AgentWalletStaking is AgentWallet {
             creditPool.borrowFromCreditLine(mneeBorrowAmount);
         }
         
-        hasStaked[msg.sender] = true;
-        emit StakedForAgent(msg.sender, mneeStakeAmount, block.timestamp);
+        hasStaked[address(this)] = true;
+        emit StakedForAgent(address(this), mneeStakeAmount, block.timestamp);
         if (mneeBorrowAmount > 0) {
-            emit BorrowedForAgent(msg.sender, mneeBorrowAmount, block.timestamp);
+            emit BorrowedForAgent(address(this), mneeBorrowAmount, block.timestamp);
         }
     }
     
@@ -60,17 +61,17 @@ contract AgentWalletStaking is AgentWallet {
     /**
      * @dev Repay borrowed MNEE
      * @param mneeAmount Amount to repay
+     * @notice Must be called via EntryPoint execute() function
      */
-    function repayCredit(uint256 mneeAmount) external {
-        // Can be called by owner or via EntryPoint
+    function repayCredit(uint256 mneeAmount) external onlyEntryPoint {
         creditPool.repayCredit(mneeAmount);
     }
     
     /**
      * @dev Claim staking rewards
+     * @notice Must be called via EntryPoint execute() function
      */
-    function claimStakingRewards() external {
-        // Can be called by owner or via EntryPoint
+    function claimStakingRewards() external onlyEntryPoint {
         creditPool.claimRewards();
     }
 }

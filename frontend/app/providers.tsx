@@ -16,18 +16,25 @@ import {
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 
 // Support multiple chains for broader MNEE reach
+// Always include Sepolia for demo purposes
 const supportedChains = [
   mainnet,
+  sepolia, // Always include for demo
   base,
   polygon,
   arbitrum,
-  // Testnets (can be removed in production)
-  ...(process.env.NODE_ENV === "development" ? [sepolia, baseSepolia, polygonMumbai, arbitrumSepolia] : []),
+  // Additional testnets for development
+  ...(process.env.NODE_ENV === "development" ? [baseSepolia, polygonMumbai, arbitrumSepolia] : []),
 ];
+
+// Get WalletConnect project ID from environment or use a default demo ID
+// Note: For production, you should get your own from https://cloud.walletconnect.com
+const walletConnectProjectId = process.env.NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID || 
+  (process.env.NODE_ENV === "development" ? "demo-project-id" : "");
 
 const config = getDefaultConfig({
   appName: "QuipoWallet",
-  projectId: process.env.NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID || "YOUR_PROJECT_ID",
+  projectId: walletConnectProjectId || "demo-project-id",
   chains: supportedChains as any,
   ssr: true,
 });

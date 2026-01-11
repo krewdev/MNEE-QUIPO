@@ -6,25 +6,139 @@ import { parseEther, formatEther } from "viem";
 import { getContractsForChain } from "@/config/chains";
 
 const MNEETokenABI = [
-  "function balanceOf(address owner) view returns (uint256)",
-  "function approve(address spender, uint256 amount) returns (bool)",
-  "function allowance(address owner, address spender) view returns (uint256)",
+  {
+    inputs: [{ name: "owner", type: "address" }],
+    name: "balanceOf",
+    outputs: [{ name: "", type: "uint256" }],
+    stateMutability: "view",
+    type: "function",
+  },
+  {
+    inputs: [
+      { name: "spender", type: "address" },
+      { name: "amount", type: "uint256" },
+    ],
+    name: "approve",
+    outputs: [{ name: "", type: "bool" }],
+    stateMutability: "nonpayable",
+    type: "function",
+  },
+  {
+    inputs: [
+      { name: "owner", type: "address" },
+      { name: "spender", type: "address" },
+    ],
+    name: "allowance",
+    outputs: [{ name: "", type: "uint256" }],
+    stateMutability: "view",
+    type: "function",
+  },
 ] as const;
 
 const CreditPoolABI = [
-  "function stake(uint256 amount) external",
-  "function unstake(uint256 amount) external",
-  "function borrowFromCreditLine(uint256 amount) external",
-  "function repayCredit(uint256 amount) external",
-  "function provideLiquidity(uint256 amount) external",
-  "function withdrawLiquidity(uint256 amount) external",
-  "function claimRewards() external",
-  "function claimLiquidityRewards() external",
-  "function creditUsers(address) view returns (uint256 stakedAmount, uint256 creditLine, uint256 borrowedAmount, uint256 lastUpdateTime, uint256 stakingRewards, uint256 interestOwed, bool isActive)",
-  "function liquidityProviders(address) view returns (uint256 providedAmount, uint256 rewardsAccrued, uint256 lastUpdateTime)",
-  "function totalLiquidity() view returns (uint256)",
-  "function totalStaked() view returns (uint256)",
-  "function totalBorrowed() view returns (uint256)",
+  {
+    inputs: [{ name: "amount", type: "uint256" }],
+    name: "stake",
+    outputs: [],
+    stateMutability: "nonpayable",
+    type: "function",
+  },
+  {
+    inputs: [{ name: "amount", type: "uint256" }],
+    name: "unstake",
+    outputs: [],
+    stateMutability: "nonpayable",
+    type: "function",
+  },
+  {
+    inputs: [{ name: "amount", type: "uint256" }],
+    name: "borrowFromCreditLine",
+    outputs: [],
+    stateMutability: "nonpayable",
+    type: "function",
+  },
+  {
+    inputs: [{ name: "amount", type: "uint256" }],
+    name: "repayCredit",
+    outputs: [],
+    stateMutability: "nonpayable",
+    type: "function",
+  },
+  {
+    inputs: [{ name: "amount", type: "uint256" }],
+    name: "provideLiquidity",
+    outputs: [],
+    stateMutability: "nonpayable",
+    type: "function",
+  },
+  {
+    inputs: [{ name: "amount", type: "uint256" }],
+    name: "withdrawLiquidity",
+    outputs: [],
+    stateMutability: "nonpayable",
+    type: "function",
+  },
+  {
+    inputs: [],
+    name: "claimRewards",
+    outputs: [],
+    stateMutability: "nonpayable",
+    type: "function",
+  },
+  {
+    inputs: [],
+    name: "claimLiquidityRewards",
+    outputs: [],
+    stateMutability: "nonpayable",
+    type: "function",
+  },
+  {
+    inputs: [{ name: "", type: "address" }],
+    name: "creditUsers",
+    outputs: [
+      { name: "stakedAmount", type: "uint256" },
+      { name: "creditLine", type: "uint256" },
+      { name: "borrowedAmount", type: "uint256" },
+      { name: "lastUpdateTime", type: "uint256" },
+      { name: "stakingRewards", type: "uint256" },
+      { name: "interestOwed", type: "uint256" },
+      { name: "isActive", type: "bool" },
+    ],
+    stateMutability: "view",
+    type: "function",
+  },
+  {
+    inputs: [{ name: "", type: "address" }],
+    name: "liquidityProviders",
+    outputs: [
+      { name: "providedAmount", type: "uint256" },
+      { name: "rewardsAccrued", type: "uint256" },
+      { name: "lastUpdateTime", type: "uint256" },
+    ],
+    stateMutability: "view",
+    type: "function",
+  },
+  {
+    inputs: [],
+    name: "totalLiquidity",
+    outputs: [{ name: "", type: "uint256" }],
+    stateMutability: "view",
+    type: "function",
+  },
+  {
+    inputs: [],
+    name: "totalStaked",
+    outputs: [{ name: "", type: "uint256" }],
+    stateMutability: "view",
+    type: "function",
+  },
+  {
+    inputs: [],
+    name: "totalBorrowed",
+    outputs: [{ name: "", type: "uint256" }],
+    stateMutability: "view",
+    type: "function",
+  },
 ] as const;
 
 type TabType = "stake" | "borrow" | "repay" | "info" | "liquidity";
@@ -39,72 +153,81 @@ export default function CreditPool() {
   const [repayAmount, setRepayAmount] = useState("");
   const [liquidityAmount, setLiquidityAmount] = useState("");
 
-  const creditPoolAddress = CONTRACTS.creditPool;
-  const mneeTokenAddress = CONTRACTS.mneeToken;
+  const creditPoolAddress = CONTRACTS?.creditPool;
+  const mneeTokenAddress = CONTRACTS?.mneeToken;
+
+  // Helper to check if address is valid
+  const isValidAddress = (addr: string | undefined): addr is `0x${string}` => {
+    if (!addr) return false;
+    return addr !== "" && 
+           addr !== "0x0000000000000000000000000000000000000000" && 
+           addr.startsWith("0x") &&
+           addr.length === 42;
+  };
 
   // Read user credit info
   const { data: creditUser, refetch: refetchCredit } = useReadContract({
-    address: creditPoolAddress as `0x${string}`,
+    address: isValidAddress(creditPoolAddress) ? creditPoolAddress : undefined,
     abi: CreditPoolABI,
     functionName: "creditUsers",
     args: address ? [address] : undefined,
     query: {
-      enabled: !!address && !!creditPoolAddress,
+      enabled: !!address && isValidAddress(creditPoolAddress),
       refetchInterval: 5000,
     },
   });
 
   // Read liquidity provider info
   const { data: liquidityProvider, refetch: refetchLiquidity } = useReadContract({
-    address: creditPoolAddress as `0x${string}`,
+    address: isValidAddress(creditPoolAddress) ? creditPoolAddress : undefined,
     abi: CreditPoolABI,
     functionName: "liquidityProviders",
     args: address ? [address] : undefined,
     query: {
-      enabled: !!address && !!creditPoolAddress,
+      enabled: !!address && isValidAddress(creditPoolAddress),
       refetchInterval: 5000,
     },
   });
 
   // Read pool stats
   const { data: totalLiquidity } = useReadContract({
-    address: creditPoolAddress as `0x${string}`,
+    address: isValidAddress(creditPoolAddress) ? creditPoolAddress : undefined,
     abi: CreditPoolABI,
     functionName: "totalLiquidity",
     query: {
-      enabled: !!creditPoolAddress,
+      enabled: isValidAddress(creditPoolAddress),
       refetchInterval: 5000,
     },
   });
 
   const { data: totalStaked } = useReadContract({
-    address: creditPoolAddress as `0x${string}`,
+    address: isValidAddress(creditPoolAddress) ? creditPoolAddress : undefined,
     abi: CreditPoolABI,
     functionName: "totalStaked",
     query: {
-      enabled: !!creditPoolAddress,
+      enabled: isValidAddress(creditPoolAddress),
       refetchInterval: 5000,
     },
   });
 
   const { data: totalBorrowed } = useReadContract({
-    address: creditPoolAddress as `0x${string}`,
+    address: isValidAddress(creditPoolAddress) ? creditPoolAddress : undefined,
     abi: CreditPoolABI,
     functionName: "totalBorrowed",
     query: {
-      enabled: !!creditPoolAddress,
+      enabled: isValidAddress(creditPoolAddress),
       refetchInterval: 5000,
     },
   });
 
   // Read MNEE balance
   const { data: mneeBalance } = useReadContract({
-    address: mneeTokenAddress as `0x${string}`,
+    address: isValidAddress(mneeTokenAddress) ? mneeTokenAddress : undefined,
     abi: MNEETokenABI,
     functionName: "balanceOf",
     args: address ? [address] : undefined,
     query: {
-      enabled: !!address && !!mneeTokenAddress,
+      enabled: !!address && isValidAddress(mneeTokenAddress),
       refetchInterval: 5000,
     },
   });
@@ -113,26 +236,28 @@ export default function CreditPool() {
   const { isLoading: isConfirming, isSuccess, isError: txError } = useWaitForTransactionReceipt({ hash });
 
   const handleStake = async () => {
-    if (!stakeAmount || !creditPoolAddress || !mneeTokenAddress) return;
+    if (!stakeAmount || !isValidAddress(creditPoolAddress) || !isValidAddress(mneeTokenAddress)) return;
     const amount = parseEther(stakeAmount);
 
     try {
       // First approve
       const approveHash = await writeContract({
-        address: mneeTokenAddress as `0x${string}`,
+        address: mneeTokenAddress,
         abi: MNEETokenABI,
         functionName: "approve",
-        args: [creditPoolAddress as `0x${string}`, amount],
+        args: [creditPoolAddress, amount],
       });
 
       // Wait for approval, then stake
       setTimeout(async () => {
-        await writeContract({
-          address: creditPoolAddress as `0x${string}`,
-          abi: CreditPoolABI,
-          functionName: "stake",
-          args: [amount],
-        });
+        if (isValidAddress(creditPoolAddress)) {
+          await writeContract({
+            address: creditPoolAddress,
+            abi: CreditPoolABI,
+            functionName: "stake",
+            args: [amount],
+          });
+        }
       }, 2000);
     } catch (error) {
       console.error("Error staking:", error);
@@ -140,11 +265,11 @@ export default function CreditPool() {
   };
 
   const handleBorrow = async () => {
-    if (!borrowAmount || !creditPoolAddress) return;
+    if (!borrowAmount || !isValidAddress(creditPoolAddress)) return;
     const amount = parseEther(borrowAmount);
 
     writeContract({
-      address: creditPoolAddress as `0x${string}`,
+      address: creditPoolAddress,
       abi: CreditPoolABI,
       functionName: "borrowFromCreditLine",
       args: [amount],
@@ -152,26 +277,28 @@ export default function CreditPool() {
   };
 
   const handleRepay = async () => {
-    if (!repayAmount || !creditPoolAddress || !mneeTokenAddress) return;
+    if (!repayAmount || !isValidAddress(creditPoolAddress) || !isValidAddress(mneeTokenAddress)) return;
     const amount = parseEther(repayAmount);
 
     try {
       // First approve
       const approveHash = await writeContract({
-        address: mneeTokenAddress as `0x${string}`,
+        address: mneeTokenAddress,
         abi: MNEETokenABI,
         functionName: "approve",
-        args: [creditPoolAddress as `0x${string}`, amount],
+        args: [creditPoolAddress, amount],
       });
 
       // Wait for approval, then repay
       setTimeout(async () => {
-        await writeContract({
-          address: creditPoolAddress as `0x${string}`,
-          abi: CreditPoolABI,
-          functionName: "repayCredit",
-          args: [amount],
-        });
+        if (isValidAddress(creditPoolAddress)) {
+          await writeContract({
+            address: creditPoolAddress,
+            abi: CreditPoolABI,
+            functionName: "repayCredit",
+            args: [amount],
+          });
+        }
       }, 2000);
     } catch (error) {
       console.error("Error repaying:", error);
@@ -179,26 +306,28 @@ export default function CreditPool() {
   };
 
   const handleProvideLiquidity = async () => {
-    if (!liquidityAmount || !creditPoolAddress || !mneeTokenAddress) return;
+    if (!liquidityAmount || !isValidAddress(creditPoolAddress) || !isValidAddress(mneeTokenAddress)) return;
     const amount = parseEther(liquidityAmount);
 
     try {
       // First approve
       const approveHash = await writeContract({
-        address: mneeTokenAddress as `0x${string}`,
+        address: mneeTokenAddress,
         abi: MNEETokenABI,
         functionName: "approve",
-        args: [creditPoolAddress as `0x${string}`, amount],
+        args: [creditPoolAddress, amount],
       });
 
       // Wait for approval, then provide liquidity
       setTimeout(async () => {
-        await writeContract({
-          address: creditPoolAddress as `0x${string}`,
-          abi: CreditPoolABI,
-          functionName: "provideLiquidity",
-          args: [amount],
-        });
+        if (isValidAddress(creditPoolAddress)) {
+          await writeContract({
+            address: creditPoolAddress,
+            abi: CreditPoolABI,
+            functionName: "provideLiquidity",
+            args: [amount],
+          });
+        }
       }, 2000);
     } catch (error) {
       console.error("Error providing liquidity:", error);
@@ -206,9 +335,9 @@ export default function CreditPool() {
   };
 
   const handleClaimRewards = async () => {
-    if (!creditPoolAddress) return;
+    if (!isValidAddress(creditPoolAddress)) return;
     writeContract({
-      address: creditPoolAddress as `0x${string}`,
+      address: creditPoolAddress,
       abi: CreditPoolABI,
       functionName: "claimRewards",
       args: [],
@@ -216,20 +345,21 @@ export default function CreditPool() {
   };
 
   const handleClaimLiquidityRewards = async () => {
-    if (!creditPoolAddress) return;
+    if (!isValidAddress(creditPoolAddress)) return;
     writeContract({
-      address: creditPoolAddress as `0x${string}`,
+      address: creditPoolAddress,
       abi: CreditPoolABI,
       functionName: "claimLiquidityRewards",
       args: [],
     });
   };
 
-  if (!creditPoolAddress) {
+  if (!isValidAddress(creditPoolAddress)) {
     return (
       <div className="bg-gray-800/50 backdrop-blur-sm rounded-lg p-6 border border-gray-700">
         <h2 className="text-2xl font-bold mb-4">💎 MNEE Credit Pool</h2>
         <p className="text-gray-400">Credit pool not deployed on this chain.</p>
+        <p className="text-xs text-gray-500 mt-2">Please switch to Sepolia testnet (Chain ID: 11155111)</p>
       </div>
     );
   }

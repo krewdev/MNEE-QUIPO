@@ -31,7 +31,11 @@
     "check-balance": "hardhat run scripts/check-balance.ts",
     "fund-paymaster": "hardhat run scripts/fund-paymaster.ts",
     "test:wallet": "hardhat run scripts/test-wallet-creation.ts --network sepolia",
-    "test:paymaster": "hardhat run scripts/test-paymaster.ts --network sepolia"
+    "test:paymaster": "hardhat run scripts/test-paymaster.ts --network sepolia",
+    "flatten": "npx ts-node scripts/flatten-contract.ts",
+    "flatten:paymaster": "npx ts-node scripts/flatten-contract.ts MNEEPaymaster",
+    "flatten:token": "npx ts-node scripts/flatten-contract.ts MNEEToken",
+    "flatten:factory": "npx ts-node scripts/flatten-contract.ts AgentWalletFactory"
   },
   "devDependencies": {
     "@nomicfoundation/hardhat-toolbox": "^4.0.0",

@@ -96,9 +96,13 @@ contract AgentWallet is BaseAccount, Ownable, EIP712 {
     }
     
     /**
-     * @dev Withdraw from EntryPoint
+     * @dev Withdraw from EntryPoint deposit balance
+     * @notice This can only withdraw from this contract's EntryPoint deposit balance
+     * The EntryPoint deposit belongs to this contract address, not the owner
      */
     function withdrawTo(address payable withdrawAddress, uint256 amount) public onlyOwner {
+        // EntryPoint.withdrawTo() can only withdraw from the caller's deposit balance
+        // Since we're calling from this contract, it can only withdraw this contract's deposits
         entryPoint().withdrawTo(withdrawAddress, amount);
     }
     

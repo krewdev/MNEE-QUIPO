@@ -228,6 +228,29 @@ export class BitcoinMNEE {
     feeRate?: number,
     wif?: string
   ): Promise<string> {
+    // Validate Bitcoin address format
+    // Bitcoin addresses can be:
+    // - Legacy (P2PKH): starts with 1, ~34 chars
+    // - P2SH: starts with 3, ~34 chars
+    // - Bech32 (SegWit): starts with bc1, ~42-62 chars
+    // - BSV21: might have different format
+    
+    if (!toAddress || toAddress.length < 26 || toAddress.length > 62) {
+      throw new Error(`Invalid Bitcoin address format: ${toAddress}. Address must be 26-62 characters.`);
+    }
+    
+    // Basic format check (doesn't validate checksum, but checks prefix)
+    const isValidFormat = 
+      toAddress.startsWith("1") ||      // Legacy P2PKH
+      toAddress.startsWith("3") ||      // P2SH
+      toAddress.startsWith("bc1") ||    // Bech32 SegWit
+      toAddress.startsWith("tb1");      // Testnet Bech32
+    
+    if (!isValidFormat) {
+      console.warn(`⚠️  Address format may not be standard Bitcoin: ${toAddress}`);
+      console.warn("   Standard formats: Legacy (1...), P2SH (3...), Bech32 (bc1.../tb1...)");
+    }
+    
     // Try MNEE SDK first (requires WIF)
     if (this.useMNEE && this.mneeSDK && wif) {
       try {
@@ -245,12 +268,21 @@ export class BitcoinMNEE {
 
         return transferResponse.ticketId || transferResponse.rawtx || "pending";
       } catch (error: any) {
-        console.warn(`MNEE SDK transfer failed: ${error.message}, falling back to OrdinalsBot`);
+        const errorMsg = error.message || String(error);
+        if (errorMsg.includes("Invalid recipient address") || errorMsg.includes("invalid address")) {
+          console.warn(`⚠️  MNEE SDK rejected address format: ${toAddress}`);
+          console.warn(`   Error: ${errorMsg}`);
+          console.warn(`   Falling back to OrdinalsBot API...`);
+        } else {
+          console.warn(`⚠️  MNEE SDK transfer failed: ${errorMsg}, falling back to OrdinalsBot`);
+        }
         // Fall through to OrdinalsBot
       }
     }
     
     // Fallback to OrdinalsBot (doesn't require WIF, uses API)
+    // Note: OrdinalsBot API may have limitations or different requirements
+    // For production use, prefer MNEE SDK with MNEE_API_KEY
     try {
       // Create BRC-20 transfer inscription via OrdinalsBot
       const inscriptionId = await this.ordinalsBot.createTransfer(
@@ -262,7 +294,23 @@ export class BitcoinMNEE {
 
       return inscriptionId;
     } catch (error: any) {
-      throw new Error(`Failed to create send transaction: ${error.message}`);
+      const errorMsg = error.message || String(error);
+      const statusCode = error.response?.status;
+      
+      // Provide helpful error messages based on error type
+      if (statusCode === 500) {
+        throw new Error(`OrdinalsBot API server error (500): The API encountered an internal error. This might be due to: 1) API format changes, 2) Server issues, or 3) Unsupported operation. Recommendation: Use MNEE SDK instead by setting MNEE_API_KEY in .env file (preferred for MNEE tokens). Original error: ${errorMsg}`);
+      }
+      
+      if (errorMsg.includes("Invalid recipient address") || errorMsg.includes("invalid address")) {
+        throw new Error(`Invalid Bitcoin recipient address: ${toAddress}. The address format may not be supported by OrdinalsBot API. Valid formats: Legacy (1...), P2SH (3...), Bech32 (bc1.../tb1...).`);
+      }
+      
+      if (errorMsg.includes("HTTP 500") || errorMsg.includes("500")) {
+        throw new Error(`OrdinalsBot API server error: ${errorMsg}. For MNEE token transfers, we recommend using the official MNEE SDK instead. Set MNEE_API_KEY in .env file and provide your Bitcoin WIF when prompted.`);
+      }
+      
+      throw new Error(`Failed to create send transaction: ${errorMsg}`);
     }
   }
 

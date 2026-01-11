@@ -5,9 +5,33 @@ import { useWriteContract, useReadContract, useWaitForTransactionReceipt, useCha
 import { parseEther } from "viem";
 
 const FactoryABI = [
-  "function createWallet(address owner, uint256 salt) returns (address)",
-  "function getAddress(address owner, uint256 salt) view returns (address)",
-  "function getWallet(address owner) view returns (address)",
+  {
+    inputs: [
+      { name: "owner", type: "address" },
+      { name: "salt", type: "uint256" }
+    ],
+    name: "createWallet",
+    outputs: [{ name: "", type: "address" }],
+    stateMutability: "nonpayable",
+    type: "function",
+  },
+  {
+    inputs: [
+      { name: "owner", type: "address" },
+      { name: "salt", type: "uint256" }
+    ],
+    name: "getAddress",
+    outputs: [{ name: "", type: "address" }],
+    stateMutability: "view",
+    type: "function",
+  },
+  {
+    inputs: [{ name: "owner", type: "address" }],
+    name: "getWallet",
+    outputs: [{ name: "", type: "address" }],
+    stateMutability: "view",
+    type: "function",
+  },
 ] as const;
 
 interface WalletFactoryProps {

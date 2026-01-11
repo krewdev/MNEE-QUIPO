@@ -279,6 +279,7 @@ contract BridgeMNEE is Ownable, ReentrancyGuard {
     
     /**
      * @dev Emergency function to unlock UTXOs if Bitcoin release fails (UTXO model)
+     * @notice Transfers locked UTXOs back to the user
      */
     function unlockEVMLockUTXO(bytes32 lockId) external onlyOwner {
         EVMLock storage lock = evmLocks[lockId];
@@ -290,9 +291,24 @@ contract BridgeMNEE is Ownable, ReentrancyGuard {
         lock.processed = true;
         
         // Get the UTXOs that were locked (they should be owned by this contract)
-        // We need to transfer them back to the user
-        // Since UTXOs are locked in contract, we create new UTXOs for the user
-        utxoToken.mint(lock.sender, lock.amount);
+        // Verify they exist and are owned by this contract
+        bytes32[] memory inputUTXOs = new bytes32[](lock.utxoIds.length);
+        uint256 totalLocked = 0;
+        for (uint256 i = 0; i < lock.utxoIds.length; i++) {
+            MNEETokenUTXO.UTXO memory utxo = utxoToken.getUTXO(lock.utxoIds[i]);
+            require(utxo.owner == address(this), "BridgeMNEE: UTXO not owned by contract");
+            require(!utxo.spent, "BridgeMNEE: UTXO already spent");
+            inputUTXOs[i] = lock.utxoIds[i];
+            totalLocked += utxo.amount;
+        }
+        
+        // Transfer UTXOs back to the user (contract spends its UTXOs, creates output to user)
+        uint256[] memory outputAmounts = new uint256[](1);
+        address[] memory outputOwners = new address[](1);
+        outputAmounts[0] = totalLocked; // Transfer all locked amount
+        outputOwners[0] = lock.sender;
+        
+        utxoToken.transfer(inputUTXOs, outputAmounts, outputOwners);
         
         emit EVMReleased(lockId, bytes32(0), lock.bitcoinAddress, lock.amount);
     }
